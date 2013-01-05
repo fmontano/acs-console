@@ -1,12 +1,15 @@
 
 var _ = require('underscore');
 
-var commands = "query search create update show".split(' ');
-var objects = "photos places users chats acls".split(' ');
+
+/// Getting all available commands
+var commandList = require('./commander').COMMAND_LIST;
+/// Getting all objects
+var objectList = require('./commander').OBJECT_LIST;
 
 var completions = "";
-_.each(commands, function(cmd){
-	_.each(objects, function(obj){
+_.each(commandList, function(cmd){
+	_.each(objectList, function(obj){
 		completions += cmd+obj.charAt(0).toUpperCase() + obj.slice(1) + " ";
 	})
 })
