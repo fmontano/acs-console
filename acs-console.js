@@ -14,6 +14,7 @@ var stdin = process.openStdin();
 process.stdin.setRawMode();
 
 var previousCommands = [];
+var currentCommand;
 
 /// up arrow {"name":"up","ctrl":false,"meta":false,"shift":false,"sequence":"\u001b[A","code":"[A"}
 /// a {"name":"a","ctrl":false,"meta":false,"shift":false,"sequence":"a"}
@@ -30,12 +31,16 @@ GLOBAL.error = function(msg){
 GLOBAL.warning = function(msg){
 	console.log(clc.yellow.bold("[Warning] "+msg));
 }
+GLOBAL.info = function(msg){
+	console.log(clc.green.bold("[Info] "+msg));
+}
 
 stdin.on('keypress', function (chunk, key) {
-	//process.stdout.write('Get key: ' + JSON.stringify(key) + '\n');
-	if( lineStarted==true ){
-		return;
-	}
+	
+	// if( lineStarted==true ){
+	// 	return;
+	// }
+
 	if(key){
 		if (key && key.ctrl && key.name == 'c') {console.log("tomo?"); return false;};
 		if( key.name == "up" ){
@@ -45,6 +50,10 @@ stdin.on('keypress', function (chunk, key) {
 			}
 		} else if ( key.name == "down" ){
 			upArrowCounter > 0 && upArrowCounter--;
+		} else if( key.name == "escape" ){
+			showingDetails = false;
+			rl.setPrompt('acs> ', 5);
+			rl.prompt();
 		} else {
 			upArrowCounter = 0;
 			lineStarted = true;
@@ -87,18 +96,22 @@ rl.setPrompt('acs> ', 5);
 rl.prompt();
 
 rl.on('line', function (cmd) {
-	if(!executing){
+	if(!executing && !showingDetails){
 		console.log("Got line");
 		lineStarted = false;
 	  	previousCommands.unshift(cmd);
 	  	executing = true;
-	  	commander.execute(cmd, function(status, data, meta){
+	  	commander.execute(cmd, function(status, data, meta, command){
+
 	  		if(status==Commander.Status.SUCCESS){
 	  			showingDetails = true;
+	  			executing = false;
 	  			dataset.data = data;
 	  			dataset.meta = meta;
+	  			currentCommand = command;
 	  			presentData();
 	  		} else {
+	  			executing = false;
 	  			meta && error(meta.message);
 	  		}
 	  		rl.prompt();
@@ -111,11 +124,7 @@ rl.on('line', function (cmd) {
 
 function presentData(){
 	var header = "";
-	_.each(dataset.meta, function(m, key){
-		if( key!="status" && key!="method_name" )
-			header+=clc.cyan.bold(key+": ") + m+' ';
-	})
-	console.log(clc.cyan.bold(header));
+	showMeta();
 
 	/// Showing the id's of the objects
 	_.each(dataset.data, function(o, index){
@@ -123,43 +132,114 @@ function presentData(){
 	})
 }
 
+function showMeta(){
+	var header = "";
+	_.each(dataset.meta, function(m, key){
+		if( key!="status" && key!="method_name" )
+			header+=clc.blue.bold(key+": ") + clc.cyan.bold(m)+' ';
+	})
+	console.log(clc.blue.bold(header));
+}
+
 function displayHelper(cmd){
-	cmd = cmd.replace(/^\s+/,'').replace(/\s+$/,'');
-	if( cmd.indexOf('expand')==0 ){
-		var cmdArr = cmd.split(' ');
-		console.log(cmdArr.length);
+	cmd = cmd.replace(/^\s+/,'').replace(/\s+$/,'').toLowerCase();
+	if( cmd=="" ){
+		error("Missing command");
+		rl.prompt();
+		return;
+	}
+	var cmdArr = cmd.split(' ');
+
+	if( cmdArr[0]=="show" ){
 		if( cmdArr.length==1 ){
-			error("Missing index to expand")
+			error("Missing index to show")
 		} else {
-			console.log(dataset.data[cmdArr[1]-1]);
+			if( cmdArr[1]=="meta" ){
+				showMeta();
+			} else if( cmdArr[1]=="all" ){
+				presentData();
+			} else if( !isNaN(cmdArr[1]) ){
+				if( cmdArr[1]>dataset.data.length ){
+					error("Index out of bounds");
+				} else {
+					/// Checking if there are some filters set
+					if( cmdArr.length>2 ){
+						var _object = {};
+						for(var i=2; i<cmdArr.length;i++){
+							dataset.data[cmdArr[1]-1][cmdArr[i]] && (_object[cmdArr[i]] = dataset.data[cmdArr[1]-1][cmdArr[i]]);	
+						}
+						console.log(_object);
+					} else {
+						console.log(dataset.data[cmdArr[1]-1]);
+					}
+					
+				}
+				
+			} else {
+				error("Invalid index");
+			}
 		}
-		rl.prompt();
-	} else if( cmd.indexOf('show')==0 ){
+		//rl.prompt();
+	} else if( cmdArr[0]=="find" ){
+		if( cmdArr.length<2 ){
+			error("Enter fields to filter by (ex. find first_name:john last_name:doe)");
+		} else {
+			var filters = [];
+			for(var i=1; i<cmdArr.length;i++){
+				var pair = cmdArr[i].split(":");
+				if( pair.length==2 ){
+					filters.push({
+						field : pair[0],
+						value : pair[1]
+					});
+				}
+			}
+			var results = _.filter(dataset.data, function(obj){
+				var valid = true;
+				_.each(filters, function(filter){
+					if( !obj[filter.field] || obj[filter.field].toLowerCase()!=filter.value ){
+						valid = false;
+					} 
+				})
+				return valid;
+			});
+			if( results.length==0 ){
+				info("No results found.");
+			} else {
+				info(results.length + " result(s) found.");
+				console.log(results);
+			}
+			
+		}
+		//rl.prompt();
+	} else if( cmdArr[0]=="list" ){
 		presentData();
-		rl.prompt();
-	} else if( cmd.indexOf('copy')==0 ){
+		//rl.prompt();
+	} else if( cmdArr[0]=="copy" ){
 		var cmdArr = cmd.split(' ');
 		console.log(cmdArr.length);
 		if( cmdArr.length==1 ){
-			error("Missing index to expand. Use 'copy all' to copy all records to clipboard")
+			error("Missing index to show. Use 'copy all' to copy all records to clipboard")
 		} else {
 			if(cmdArr[1]=="all"){
 				console.log(dataset.data[cmdArr[1]-1]);
 				require('child_process').exec('echo "'+JSON.stringify(dataset.data)+'" | pbcopy');
+				info("Object copied to clipboard");
 			} else {
 				if(!isNaN(cmdArr[1])){
 					require('child_process').exec('echo "'+JSON.stringify(dataset.data[cmdArr[1]-1])+'" | pbcopy');
+					info("Object copied to clipboard");
 				} else {
 					error("Enter a valid number between 1 and "+dataset.data.length);
 				}
 			}
 			
 		}
-		rl.prompt();
+		
 	} else {
 		error("Invalid command")
-		rl.prompt();
 	}
+	rl.prompt();
 }
 
 /// Copying to clipboard ("OSX only")

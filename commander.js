@@ -57,16 +57,16 @@ var Commander = function(rl){
 	self.execute = function(cmd, callback){
 		cmd = cmd.toLowerCase();
 		if(!cmd || !callback){
-			callback && callback(Status.FAILED, { error : "Missing command"});
+			callback && callback(Status.FAILED, null, { error : "Missing command"});
 			return false;
 		}
 		
 		var command = parse(cmd);
 
 		if( !command ){
-			callback(Status.FAILED)
+			callback && callback(Status.FAILED, null, { code : command , message : "Invalid command."}, command);
 		} else if( command==Error.INVALID_COMMAND || command==Error.INVALID_OBJECT ){
-			callback && callback(Status.FAILED, null, { code : command , message : Error.Message[command] || "Error."});
+			callback && callback(Status.FAILED, null, { code : command , message : Error.Message[command] || "Error."}, command);
 			return false;
 		} else {
 			executing = true;
@@ -112,7 +112,6 @@ var Commander = function(rl){
 		if( !command ){
 			return Error.INVALID_COMMAND;
 		} else {
-
 			var object = cmd.replace(command, '');
 			console.log('obj : '+object + " > "+(objects.indexOf(object)));
 			if( objects.indexOf(object)<0 ){
@@ -130,7 +129,6 @@ var Commander = function(rl){
 				return retValue;
 			}
 		}
-		console.log("FOund? "+command);
 		//if( commands.indexOf(command)==-1 ){
 			/// Command not found
 		//	return null;
@@ -173,7 +171,7 @@ var Commander = function(rl){
 										//.(obj);
 										getParams(index+1);
 									} catch (e){
-										error(field + " must be a JSON object");
+										error(field + " must be a valid JSON object");
 										getParams(index);
 									}
 								break;
