@@ -72,7 +72,7 @@ var Commander = function(rl){
 			executing = true;
 			console.log(command);
 			getExtras(cmd, function(extras){
-				console.log("Got extras : "+JSON.stringify(extras));
+				//console.log("Got extras : "+JSON.stringify(extras));
 				if( !extras.per_page )
 					extras.per_page = conf.acs.per_page;
 				console.log("Executing cmd");
@@ -113,7 +113,6 @@ var Commander = function(rl){
 			return Error.INVALID_COMMAND;
 		} else {
 			var object = cmd.replace(command, '');
-			console.log('obj : '+object + " > "+(objects.indexOf(object)));
 			if( objects.indexOf(object)<0 ){
 				return Error.INVALID_OBJECT;
 			} else {
@@ -166,12 +165,13 @@ var Commander = function(rl){
 									console.log("validating object");
 									try {
 										var _object = JSON.parse(str);
-										var obj = {};
-										extras[field] = _object;
+										//var obj = {};
+										extras[field] = JSON.stringify(_object);
 										//.(obj);
 										getParams(index+1);
 									} catch (e){
 										error(field + " must be a valid JSON object");
+										error(e);
 										getParams(index);
 									}
 								break;
@@ -203,7 +203,6 @@ var Commander = function(rl){
 			}
 		}
 	}
-
 }
 
 module.exports = Commander;
