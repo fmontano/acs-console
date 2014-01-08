@@ -2,23 +2,16 @@ var _ = require('underscore'),
 	acs = require('./lib/acs'),
 	conf = require('./conf');
 
-
-// var client = new acs.Client({
-//     applicationkey: conf.acs.key,
-//     oauthKey: conf.acs.oauth,
-//     oauthSecret: conf.acs.secret
-// });
-
-
-
-var client = acs.createCocoafish('XNgsVvdtxRkuYudfzUYLpPszdRoGr58d');
+var client = acs.createCocoafish(conf.acs.key);
 
 /// List of accepted commands
 var commands = "create update delete query search show".split(' ');
+/// List of objects
 var objects = "photos places users chats acls".split(' ').sort(function(a,b){ if (a > b) return 1;if (b > a) return -1;return 0; });
 
 /// Control variables
 var executing = false;
+
 var Status = {
 	SUCCESS : 1,
 	FAILED : 0
@@ -41,14 +34,6 @@ var Commander = function(rl){
 
 	/// Getting current console
 	self.rl = rl;
-
-	// if( self.rl ){
-	// 	rl.on('line', function (line) {
-	// 		if(executing){
-	// 			console.log(line)
-	// 		}
-	// 	});
-	// }
 
 	self.getCommands = function(){
 		return commands;
@@ -76,6 +61,8 @@ var Commander = function(rl){
 				if( !extras.per_page )
 					extras.per_page = conf.acs.per_page;
 				console.log("Executing cmd");
+				console.log(extras)
+				console.log(command.object + '/' + command.cmd + '.json');
 				client.sendRequest(command.object + '/' + command.cmd + '.json', command.method, extras, function(e){
 					//console.log(e);
 					executing = false;
@@ -149,6 +136,7 @@ var Commander = function(rl){
 
 		var extras = [];
 
+		/// Prompting the user for additional data for the query (where, order, ...)
 		function getParams(index){
 			if( index >= params.length ){
 				/// Done getting extras
@@ -162,28 +150,26 @@ var Commander = function(rl){
 						if( params[index].validation ){
 							switch(params[index].validation){
 								case 'object':
-									console.log("validating object");
 									try {
 										var _object = JSON.parse(str);
-										//var obj = {};
 										extras[field] = JSON.stringify(_object);
-										//.(obj);
+										/// Get next parameter
 										getParams(index+1);
 									} catch (e){
 										error(field + " must be a valid JSON object");
-										error(e);
+										/// Ask user to enter this parameter again.
 										getParams(index);
 									}
 								break;
 								case 'int':
 									if( !/^\d+$/.test(str) ){
 										error(field + " must be a integer");
+										/// Get next parameter
 										getParams(index);
 									} else {
 										var obj = {};
-										//obj[field] = Number(str);
-										//extras.push(obj);
 										extras[field] = Number(str);
+										/// Ask user to enter this parameter again.
 										getParams(index+1);
 									}
 								break;
@@ -193,12 +179,9 @@ var Commander = function(rl){
 							extras[field] = str;
 							getParams(index+1);
 						}
-
-						
 					} else {
 						getParams(index+1);
 					}
-					
 				});
 			}
 		}
